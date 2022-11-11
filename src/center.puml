@@ -1,0 +1,89 @@
+@startuml
+skin rose
+
+partition fetch_periodically() {
+    (*)-->"遍历拉取所有关注的 service_name\n zoo_aget_children()"
+    if "is_root" then
+        -->[yes] "注入回调：\n get_children_completion2()"  as reg_child2_1
+    else
+        -->[no] "注入回调：\n get_children_completion()" as reg_child_1
+    endif
+}
+
+partition get_children_completion2() {
+    reg_child2_1-->"判断拉取 children 的结果" as children2
+    if "拉取成功" then
+        -->[yes] "遍历拉取每个 child\n zoo_awget()"
+        -->"注入回调：\n get_completion2()"
+    else
+        -->[no] "判断是否带 root 节点"
+        if "is_root" then
+            -->[yes]"调用回调：\n GetContractsCallback()" as get_contract1
+        else
+            -->[no] "调用回调：\n on_query_complete2(leaf=false)" as on_query1
+        endif
+    endif
+}
+
+partition get_children_completion() {
+    reg_child_1 --> "判断拉取 children 的结果" as children1
+    if "拉取成功" then
+        -->[yes] "遍历拉取各个 child\n zoo_aget()"
+        -->"注入回调：\n get_completion()" as call_complelion_1
+    else
+        -->[no]"调用回调：\n GetContractsCallback()" as get_contract3
+    endif
+}
+
+partition get_completion2() {
+    "注入回调：\n get_completion2()"-->"判断拉取结果" as node2
+    -->"判断是否叶子节点"
+    if "is_leaf" then
+        -->[no]"获取所有子节点\n zoo_awget_children"
+        -->"注入回调：\n get_children_completion2()" as reg_child2_2
+        -->children2
+    else
+        -->[yes]"调用回调\n on_query_complete2(leaf=true)" as call_query2_2
+    endif
+}
+
+partition get_completion() {
+    call_complelion_1 --> "调用回调：\n on_query_complete()" as call_query1
+}
+
+partition on_query_complete2() {
+    call_query2_2 -->"判断是否为叶节点" as query2
+    on_query1-->query2
+    if "is_leaf" then
+        -->[yes] "解析叶节点数据"
+        -->"判断是否拉取完" as query_comp
+    else
+        -->[no] "仅做标记"
+        -->query_comp
+    endif
+    if "拉取完" then
+        -->[是]"判断是否为 is_root"
+        if "is_root" then
+            -->[yes]"调用回调：\n GetContractsCallback()" as get_contract2
+        else
+            -->[no] "获取父回调"
+            --> "调用父回调的回调：\n on_query_complete2(leaf=false)" as on_query2
+            --> query2
+        endif
+    endif
+}
+
+partition on_query_complete() {
+    call_query1 --> "解析节点数据" as query1_begin
+    --> "筛选 contract"
+    if "是否拉取完" then
+        -->[yes] "调用回调：\n GetContractsCallback()" as get_contract4
+    endif
+}
+
+
+' partition GetContractsCallback() {
+'     get_contract1-->"处理获取到的 contract_map" as get_contract_begin    
+'     get_contract2--> get_contract_begin    
+' }
+@enduml
