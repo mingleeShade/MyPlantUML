@@ -9,16 +9,10 @@ participant login
 participant gateway
 participant scene
 participant record
-participant public
-participant msg
-participant msdk
 
 participant new_gateway
 participant new_scene
 participant new_record
-participant new_public
-participant new_msg
-participant new_msdk
 
 actor 运维
 
@@ -26,7 +20,22 @@ player1->gateway: 玩家连接着老进程
 player2->gateway: 玩家连接着老进程
 == 开始不停服维护 ==
 运维-> super: 发送信号，即将进行不停服更新
-... 同步状态 ...
+
+    group 开始同步状态
+    super -> gateway: 通知状态: 即将进入新老服切换
+    super <-- gateway: 收到通知
+
+    super -> scene: 通知状态: 即将进入新老服切换
+    super <-- scene: 收到通知
+
+    super -> record: 通知状态: 即将进入新老服切换
+    super <-- record: 收到通知
+
+    super -> super: 所有进程通知到位
+    end
+
+super -> gateway: 懒
+
 scene-->player1: 通知不在战斗状态的玩家退出游戏后更新
 scene-->player2: 战斗中的玩家战斗结束后退出游戏更新
 super->gateway: 不再接收新玩家登录
