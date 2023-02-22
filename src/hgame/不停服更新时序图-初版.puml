@@ -1,6 +1,9 @@
 @startuml
+' 通用设置
 skin rose
-' 定义角色
+autoactivate on
+
+' ===定义角色===
 actor player1
 actor player2
 participant super
@@ -11,32 +14,170 @@ participant scene
 participant record
 
 participant new_gateway
-participant new_scene
 participant new_record
+participant new_scene
 
+participant 客户端资源配置 as res
 actor 运维
+' ===定义角色结束===
 
 player1->gateway: 玩家连接着老进程
+player1 <-- gateway
 player2->gateway: 玩家连接着老进程
-== 开始不停服维护 ==
-运维-> super: 发送信号，即将进行不停服更新
+player2 <-- gateway
 
-    group 开始同步状态
+== 不停服维护前准备 ==
+group 运维开启新进程
+new_gateway <- 运维 **: 开启 new_gateway
+new_gateway -> super: 与 super 建立链接，上报自身 version
+super --> new_gateway: ack
+
+new_record <- 运维 **: 开启 new_record
+note right: 进入不停服维护状态，暂时不接收服务
+new_record -> super: 与 super 建立链接，上报自身 version
+super --> new_record: ack
+
+new_scene <- 运维 **: 开启 new_scene
+new_scene -> super: 与 super 建立链接，上报自身 version
+super --> new_scene: ack
+
+end
+
+== 不停服维护状态同步和切换 ==
+运维-> super: 发送信号，即将进行不停服更新
+super --> 运维
+
+group 开始同步状态
+    super -> super: 检查是否所有进程通知完
     super -> gateway: 通知状态: 即将进入新老服切换
     super <-- gateway: 收到通知
 
     super -> scene: 通知状态: 即将进入新老服切换
     super <-- scene: 收到通知
+    note right: scene 上进入【不停服热更状态】，\n部分协议停止服务。
 
     super -> record: 通知状态: 即将进入新老服切换
     super <-- record: 收到通知
 
-    super -> super: 所有进程通知到位
-    end
+    return 所有进程通知完成
+end
 
-super -> gateway: 懒
+group record 切换
+    super -> scene: 通知即将开始 record 切换
+    super <-- scene: 通知成功
+    note right: scene 进入 【record 切换状态】,\n切换过程中:\n1.阻止玩家登录\n2.阻止玩家数据保存\n3.禁止改名
 
-scene-->player1: 通知不在战斗状态的玩家退出游戏后更新
-scene-->player2: 战斗中的玩家战斗结束后退出游戏更新
-super->gateway: 不再接收新玩家登录
+    super -> record: 开始新老服务器切换
+    super <-- record
+    record -> record: 将自身数据落地
+    return 所有玩家数据落地完成
+
+    record -> super: 发起数据同步
+    super --> new_record: 转发数据同步
+
+    super -> scene: 切换成 new_record
+    scene -> scene: 断开与老 record 的链接
+    return 断开成功
+    scene -> new_record: 建立与 new_record 的链接
+    scene <-- new_record: 建立成功
+    super <-- scene: 切换 record 成功
+    note right: scene 退出【record 切换状态】回到【不停服热更状态】
+    super -> record !!: 进程停止
+end
+
+super -> gateway: 通知状态切换成功
+super <-- gateway
+super -> new_gateway: 通知状态切换成功，可以接受新玩家
+super <-- new_gateway
+
+== 运维推送客户端更新资源 ==
+
+运维 -> res: 推送新资源
+res --> 运维
+
+
+== 处理在线玩家，和新登录的玩家 ==
+gateway -> scene: 通知 scene，需要处理在线玩家
+gateway <-- scene: 通知 scene，需要处理在线玩家
+scene -> scene : 处理在线玩家
+scene --> player1: 通知不在战斗状态的玩家退出游戏后更新
+scene --> player2: 战斗中的玩家战斗结束后退出游戏更新
+'return 处理完成
+
+group 新客户端登录
+    ' 连 super
+    player1 -> res: 检查更新
+    player1 <-- res: 有新的热更包
+    player1 -> player1: 开始热更新
+    return 热更新完成
+    player1->super: 玩家更新客户端后登录
+    player1 <-- super: 下发 new_gateway 端口地址和令牌
+    super --> new_gateway: 新玩家登录令牌下发
+
+    ' 连 gateway LoginGateReq
+    player1 -> new_gateway: 玩家 login req
+    new_gateway -> new_record: 拉去角色列表
+    note left: 这里忽略 login 和 msdk
+    new_record --> new_gateway: 角色列表返回
+    new_gateway --> player1: login ack
+
+    ' 玩家上线 Online
+    player1 -> new_gateway: online req
+    new_gateway -> new_scene: online req
+    new_scene -> new_record: 拉取玩家数据
+    new_record --> new_scene: 玩家数据返回
+    new_scene --> new_gateway: online ack
+    new_gateway -->player1: online ack
+end
+
+group 战斗中的玩家处理
+    scene --> player2: 战斗结束，将玩家剔除下线
+    player2 -> super: 玩家未更新客户端时登录
+    player2 <-- super: 玩家未更新，不允许登录\n或者让玩家从老gateway登录
+end
+
+alt 如果允许老客户端登录
+    ' 连 super
+    player2 -> super: 老客户端登录请求登录
+    player2 <-- super: 给玩家分配老的 gateway，\n下发登录 token
+    super --> gateway: 下发玩家登录 token
+
+    ' 连 gateway LoginGateReq
+    player2 -> gateway: 玩家 login req
+    gateway -> new_record: 拉去角色列表
+    note left: 这里忽略 login 和 msdk
+    new_record --> gateway: 角色列表返回
+    gateway --> player2: login ack
+
+    ' 玩家上线 Online
+    player2 -> gateway: online req
+    gateway -> scene: online req
+    scene -> new_record: 拉取玩家数据
+    new_record --> scene: 玩家数据返回
+    scene --> gateway: online ack
+    gateway -->player2: online ack
+end
+
+== 老玩家都清理之后，处理老进程 ==
+
+super -> super: 检查老进程是否可以关停
+gateway -> super: 老版本的玩家都下线了
+super --> gateway: 准备关停
+
+scene -> super: 老版本的玩家都下线了
+super --> scene: 准备关停
+return 所有老版本玩家下线，可以关停
+super --> gateway!!: 关停 gateway
+super --> scene!!: 关停 scene
+
+
+== 不停服更新结束 ==
+super -> super: 检查状态结束是否通知完成
+super -> new_gateway: 不停服状态结束
+super <-- new_gateway: ack
+super -> new_scene: 不停服状态结束
+super <-- new_scene: ack
+super -> new_record: 不停服状态结束
+super <-- new_record: ack
+return 不停服状态结束通知完成，不停服更新整体流程停止
 @enduml
