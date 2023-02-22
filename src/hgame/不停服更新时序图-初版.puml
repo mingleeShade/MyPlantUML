@@ -124,6 +124,7 @@ group 新客户端登录
     ' 玩家上线 Online
     player1 -> new_gateway: online req
     new_gateway -> new_scene: online req
+    note right: 如果玩家处于公会场景，\n需要创建一个新的公会场景
     new_scene -> new_record: 拉取玩家数据
     new_record --> new_scene: 玩家数据返回
     new_scene --> new_gateway: online ack
