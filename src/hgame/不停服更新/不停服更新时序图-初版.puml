@@ -98,7 +98,7 @@ res --> 运维
 
 == 处理在线玩家，和新登录的玩家 ==
 gateway -> scene: 通知 scene，需要处理在线玩家
-gateway <-- scene: 通知 scene，需要处理在线玩家
+gateway <-- scene: ack
 scene -> scene : 处理在线玩家
 scene --> player1: 通知不在战斗状态的玩家退出游戏后更新
 scene --> player2: 战斗中的玩家战斗结束后退出游戏更新
