@@ -1,0 +1,4 @@
+@startuml
+skin rose
+[*] --> 开始进入于切换
+@enduml

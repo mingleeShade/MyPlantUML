@@ -33,8 +33,8 @@ new_gateway -> super: 与 super 建立链接，上报自身 version
 super --> new_gateway: ack
 
 new_record <- 运维 **: 开启 new_record
-note right: 进入不停服维护状态，暂时不接收服务
 new_record -> super: 与 super 建立链接，上报自身 version
+note right: 进入不停服维护状态，暂时不接收服务
 super --> new_record: ack
 
 new_scene <- 运维 **: 开启 new_scene
@@ -63,6 +63,7 @@ group 开始同步状态
 end
 
 group record 切换
+    super -> super: 检查 record 是否切换完成
     super -> scene: 通知即将开始 record 切换
     super <-- scene: 通知成功
     note right: scene 进入 【record 切换状态】,\n切换过程中:\n1.阻止玩家登录\n2.阻止玩家数据保存\n3.禁止改名
@@ -82,6 +83,7 @@ group record 切换
     scene <-- new_record: 建立成功
     super <-- scene: 切换 record 成功
     note right: scene 退出【record 切换状态】回到【不停服热更状态】
+    return 所有 scene 切换完成
     super -> record !!: 进程停止
 end
 
@@ -94,6 +96,9 @@ super <-- new_gateway
 
 运维 -> res: 推送新资源
 res --> 运维
+
+运维-> super: 客户端资源推送完成，可以处理线上玩家了
+运维 <-- super
 
 
 == 处理在线玩家，和新登录的玩家 ==
