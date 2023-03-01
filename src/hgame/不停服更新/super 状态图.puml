@@ -8,21 +8,30 @@ state ProcessSwitch_StartNew: 等待至少一组新版本进程接入
 state ProcessSwitch_RecordSwitch: 开始执行 record 的切换工作
 state choice <<choice>>
 state ProcessSwitch_Testing: QA 冒烟测试阶段，全服新旧切换前\n用来给 QA 同学进行测试
-state ProcessSwitch_Replacing: 新进程逐替换老进程的阶段
+state ProcessSwitch_Coexist: 新老进程共存阶段
+state ProcessSwitch_Recyce: 资源回收阶段
 
 
 ' 状态流转
 [*] --> RunningState
 RunningState-->ProcessSwitch_StartNew: 运维发起信号，即将进入新旧切换
+RunningState <-- ProcessSwitch_StartNew: 回退
 
 ProcessSwitch_StartNew-->ProcessSwitch_RecordSwitch: 一组进程就绪，可以开始切换
 
-ProcessSwitch_RecordSwitch --> choice: 判断当前是否是冒烟服
+RunningState <--ProcessSwitch_RecordSwitch: 回退
+
+ProcessSwitch_RecordSwitch --> choice: 完成切换工作，进行下一步前\n先判断当前是否是冒烟服
 choice --> ProcessSwitch_Testing: 是冒烟服
-choice --> ProcessSwitch_Replacing: 不是冒烟服
+RunningState <-- ProcessSwitch_Testing: 回退
 
-ProcessSwitch_Testing -> ProcessSwitch_Replacing: 冒烟结束
+choice --> ProcessSwitch_Coexist: 不是冒烟服
+RunningState <-- ProcessSwitch_Coexist: 回退
 
-ProcessSwitch_Replacing -up-> RunningState: 全部替换完成，\n回归正常状态
+ProcessSwitch_Testing -> ProcessSwitch_Coexist: 冒烟结束
+
+ProcessSwitch_Coexist --> ProcessSwitch_Recyce: 全部替换完成，\n将残余玩家踢下线\n并且关停老进程
+
+ProcessSwitch_Recyce-up->RunningState: 回归正常状态
 
 @enduml
