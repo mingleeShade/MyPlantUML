@@ -8,7 +8,7 @@ state ProcessSwitch_StartNew: 等待至少一组新版本进程接入
 state ProcessSwitch_RecordSwitch: 开始执行 record 的切换工作
 state choice <<choice>>
 state ProcessSwitch_Testing: QA 冒烟测试阶段，全服新旧切换前\n用来给 QA 同学进行测试
-state ProcessSwitch_Coexist: 新老进程共存阶段
+state ProcessSwitch_Coexist: 新老进程共存阶段，\n此时会侦测玩家在线情况，\n如下几种情况会导致状态转换:\n1.全部玩家下线\n2.运维指令\n3.到了设定时间
 state ProcessSwitch_Recyce: 资源回收阶段
 
 
@@ -30,7 +30,7 @@ ProcessSwitch_RecordSwitch <-- ProcessSwitch_Coexist: 回退
 
 ProcessSwitch_Testing -> ProcessSwitch_Coexist: 冒烟结束
 
-ProcessSwitch_Coexist --> ProcessSwitch_Recyce: 全部替换完成，\n将残余玩家踢下线\n并且关停老进程
+ProcessSwitch_Coexist --> ProcessSwitch_Recyce: 满足切换条件，\n将残余玩家踢下线\n并且关停老进程
 
 ProcessSwitch_Recyce -up-> RunningState: 回归正常状态
 ProcessSwitch_Recyce --> ProcessSwitch_RecordSwitch: 回退
