@@ -23,15 +23,16 @@ RunningState <--ProcessSwitch_RecordSwitch: 回退
 
 ProcessSwitch_RecordSwitch --> choice: 完成切换工作，进行下一步前\n先判断当前是否是冒烟服
 choice --> ProcessSwitch_Testing: 是冒烟服
-RunningState <-- ProcessSwitch_Testing: 回退
+ProcessSwitch_RecordSwitch <-- ProcessSwitch_Testing: 回退
 
 choice --> ProcessSwitch_Coexist: 不是冒烟服
-RunningState <-- ProcessSwitch_Coexist: 回退
+ProcessSwitch_RecordSwitch <-- ProcessSwitch_Coexist: 回退
 
 ProcessSwitch_Testing -> ProcessSwitch_Coexist: 冒烟结束
 
 ProcessSwitch_Coexist --> ProcessSwitch_Recyce: 全部替换完成，\n将残余玩家踢下线\n并且关停老进程
 
-ProcessSwitch_Recyce-up->RunningState: 回归正常状态
+ProcessSwitch_Recyce -up-> RunningState: 回归正常状态
+ProcessSwitch_Recyce --> ProcessSwitch_RecordSwitch: 回退
 
 @enduml
