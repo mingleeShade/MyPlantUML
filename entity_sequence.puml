@@ -1,0 +1,25 @@
+@startuml
+skin rose
+
+participant PlayerProxy as pp
+participant PlayerManager as pm
+participant ServiceMeshProxy as smp
+participant HashSlotProxy as hsp
+participant CoordinatorProxy as cp
+participant ClusterProxy as cluster
+participant Coordinator as coor
+
+==initialize==
+cp -> cluster : watch Coordinator service
+cp <-- cluster : service callback
+|||
+pm -> cluster: register PlayerManager service
+smp -> cluster: watch PlayerManager service
+cluster --> smp : PlayerManager service callback
+|||
+hsp -> cp: get service group hash_slot
+
+
+
+
+@enduml

@@ -1,0 +1,303 @@
+@startuml
+' 通用设置
+skin rose
+autoactivate on
+
+' ===定义角色===
+actor QA
+actor player
+
+participant super
+
+box "老进程" #LightBlue
+    participant gateway
+    participant scene
+    participant record
+end box
+
+participant new_gateway
+participant new_record
+participant new_scene
+
+box "跨服进程"
+    participant route
+    participant cross
+    participant battle
+    participant validate
+    participant new_validate
+end box
+
+participant 白名单列表 as white
+participant 客户端静态配置 as res
+participant 白名单静态配置 as white_res
+
+actor 运维
+' ===定义角色结束===
+
+QA->gateway: 玩家连接着老进程
+QA <-- gateway
+player->gateway: 玩家连接着老进程
+player <-- gateway
+
+== 不停服维护前准备 ==
+
+运维-> super: 发送信号，即将进行不停服更新
+super --> 运维
+
+group 运维开启新进程
+    new_gateway <- 运维 **: 开启 new_gateway
+    new_gateway -> super: 与 super 建立链接，上报自身 version
+    super --> new_gateway: ack
+
+    super -> super: 收到第一个新版本进程，等待至少一组进程接入
+
+    new_record <- 运维 **: 开启 new_record
+    new_record -> super: 与 super 建立链接，上报自身 version
+    super --> new_record: ack
+
+    new_scene <- 运维 **: 开启 new_scene
+    new_scene -> super: 与 super 建立链接，上报自身 version
+    super --> new_scene: ack
+    note right: 此时直接进入切换状态，\n同时最好是有一个通知方式，\n能告知运维开始切换了
+    return 至少一组进程接入，可以进入切换状态
+end
+
+== 不停服维护状态同步和切换 ==
+
+' 因为当前新老服共存阶段不做协议禁止，因此可以不用此状态同步阶段
+' group 通知其他进程进入不停服维护状态
+'     super -> super: 检查是否所有进程通知完
+'     super -> gateway: 通知状态: 即将进入新老服切换
+'     super <-- gateway: 收到通知
+
+'     super -> scene: 通知状态: 即将进入新老服切换
+'     super <-- scene: 收到通知
+'     note right: scene 进入【不停服更新状态】，\n此时不拦截协议
+
+'     super -> record: 通知状态: 即将进入新老服切换
+'     super <-- record: 收到通知
+
+'     return 所有进程通知完成，可以进行 record 切换
+' end
+
+group record 切换
+    super -> super: 检查 record 是否切换完成
+
+    super -> gateway: 通知即将开始 record 切换
+    super <-- gateway: 所有的 scene 通知成功
+    note right: gateway 进入 【record 切换状态】,\n切换过程中:\n1.阻止玩家拉取角色列表
+
+    super -> scene: 通知即将开始 record 切换
+    super <-- scene: 所有的 scene 通知成功
+    note right: scene 进入 【record 切换状态】,\n切换过程中:\n1.阻止玩家登录\n2.阻止玩家数据保存\n3.禁止改名
+
+    super -> record: 开始新老服务器切换
+    super <-- record
+    record -> record: 将自身数据落地
+    return 所有玩家数据落地完成
+
+    record -> super: 发起数据同步
+    super --> new_record: 转发数据同步
+    new_record -> new_record: 新建数据缓存
+    note right: 重建起玩家归属于哪个 scene 的数据缓存
+    super <-- new_record: 数据同步成功
+
+    super -> gateway: 发送 new_record 的 ip 和端口，切换成 new_record
+    gateway -> gateway: 断开与老 record 的链接
+    return 断开成功
+    gateway -> new_record: 建立与 new_record 的链接
+    gateway <-- new_record: 建立成功
+    super <-- gateway : 切换 record 成功
+    note right: gateway 退出【record 切换状态】，恢复禁止的协议
+
+    super -> scene: 发送 new_record 的 ip 和端口，切换成 new_record
+    scene -> scene: 断开与老 record 的链接
+    return 断开成功
+    scene -> new_record: 建立与 new_record 的链接
+    scene <-- new_record: 建立成功
+    super <-- scene: 切换 record 成功
+    note right: scene 退出【record 切换状态】，恢复禁止的协议
+
+    'super -> super: 检查 record 是否切换完成
+    return 所有 gateway 和 scene 切换完成
+    super -> record !!: 进程停止
+end
+
+group 同步 record 切换完成状态
+    super -> new_gateway: 通知状态切换成功，可以接受新玩家
+    super <-- new_gateway
+
+    super -> new_scene: 通知状态切换成功，恢复禁止的协议
+    super <-- new_scene
+
+    super --> 运维: 通知切换完成，可以推客户端新资源了
+end
+
+== 运维推送客户端更新资源 ==
+
+运维 -> white: 更新白名单列表（如果有变化的话）
+运维 <-- white
+
+运维 -> new_validate **: 开启新的 validate
+
+运维 -> white_res: 推送新资源
+white_res --> 运维
+
+== 冒烟阶段 ==
+QA -> gateway: QA 玩家下线
+QA <-- gateway: 下线完成
+
+group 新客户端登录
+    ' 检查更新
+    QA -> white: 检查自身是否白名单
+    QA <-- white: QA 在白名单列表中
+    QA -> white_res: 检查更新
+    QA <-- white_res: 拉取新资源
+    QA -> QA: 开始热更新
+    return 热更新完成
+    ' 连 super
+    QA->super: 玩家更新客户端后登录
+    QA <-- super: 下发 new_gateway 端口地址和令牌
+    super --> new_gateway: 新玩家登录令牌下发
+
+    ' 连 gateway LoginGateReq
+    QA -> new_gateway: 玩家 login req
+    new_gateway -> new_record: 拉去角色列表
+    note left: 这里忽略 login 和 msdk
+    new_record --> new_gateway: 角色列表返回
+    new_gateway --> QA: login ack
+
+    ' 玩家上线 Online
+    QA -> new_gateway: online req
+    new_gateway -> new_scene: online req
+    note right: 如果玩家处于公会场景，\n需要创建一个新的公会场景
+    new_scene -> new_record: 拉取玩家数据
+    new_record --> new_scene: 玩家数据返回
+    new_scene --> new_gateway: online ack
+    new_gateway -->QA: online ack
+end
+
+group 新客户端战斗
+    QA -> new_scene: 使用新的 battle_version 发起战斗
+    new_scene -> route: 路由战斗协议
+    route -> cross: 选择一个合适的 cross
+    note left: 不同的 version 优先聚集\n到不同的进程上
+    cross -> cross: 为 QA 匹配另一个相同 version 的玩家
+    return 匹配成功
+    route <-- cross: 转发匹配回包
+    new_scene <-- route: 匹配回包
+    QA <-- new_scene: 匹配成功，发送通知到玩家
+
+    cross -> cross: 条件满足，开启战斗
+    cross -> route: 发起开战协议
+    route -> battle: 挑选一个 battle，转发开战协议
+    route <-- battle: 转发开战成功
+    cross <-- route: 开战成功
+    return 移除匹配对象
+
+    route <- battle: 战斗结束，发起战斗验证
+    route --> new_validate: 为战斗挑选一个 version 匹配的 validate
+    new_validate -> new_validate: 开始战斗验证
+    return 验证完成
+    route <- new_validate: 发送战斗验证结果
+    route --> battle: 发送战斗验证结果
+    battle -> battle: 战斗结算
+    battle --> QA: 下发战斗结果
+end
+
+alt 老客户端登录
+    ' 检查更新
+    player -> white: 检查自身是否白名单
+    player <-- white: player 在白名单列表外
+    player -> res: 检查更新
+    player <-- res: 无更新
+    ' 连 super
+    player -> super: 老客户端登录请求登录
+    player <-- super: 给玩家分配老的 gateway，\n下发登录 token
+    super --> gateway: 下发玩家登录 token
+
+    ' 连 gateway LoginGateReq
+    player -> gateway: 玩家 login req
+    gateway -> new_record: 拉去角色列表
+    note left: 这里忽略 login 和 msdk
+    new_record --> gateway: 角色列表返回
+    gateway --> player: login ack
+
+    ' 玩家上线 Online
+    player -> gateway: online req
+    gateway -> scene: online req
+    scene -> new_record: 拉取玩家数据
+    new_record --> scene: 玩家数据返回
+    scene --> gateway: online ack
+    gateway -->player: online ack
+end
+
+group 老客户端战斗
+    player -> scene: 使用老的 battle_version 发起战斗
+    scene -> route: 发送匹配协议
+    route -> cross: 路由匹配协议
+    cross -> cross: 匹配相同 version 的玩家
+    return 匹配成功
+    route <-- cross: 转发匹配回包
+    scene <-- route: 匹配回包
+    player <-- scene: 匹配成功，发送通知到玩家
+
+    cross -> cross: 条件满足，开启战斗
+    cross -> route: 发起开战协议
+    route -> battle: 挑选一个 battle，转发开战协议
+    route <-- battle: 转发开战成功
+    cross <-- route: 开战成功
+    return 移除匹配对象
+
+    route <- battle: 战斗结束，发起战斗验证
+    route --> validate: 挑选一个 version 匹配的 validate
+    validate -> validate: 开始战斗验证
+    return 验证完成
+    route <- validate: 发送战斗验证结果
+    route --> battle: 发送战斗验证结果
+    battle -> battle: 战斗结算
+    battle --> player: 下发战斗结果
+end
+
+== 冒烟结束，开始全服更新 ==
+
+'运维 -> validate !!: 关闭旧的 validate
+
+运维 -> 运维: 开始推送启动全服新进程，\n等待全服 super record 切换完成
+return 全服 record 切换完成
+note left: 这里需要跟运维核定一个方案，\n如果知道所有的 super 切换完成了
+
+运维 -> res: 推送客户端新资源
+运维 <-- res
+
+== 老玩家都清理之后，处理老进程 ==
+运维 -> 运维: 根据负载情况，逐步用 new_validate 替换 validate
+note left: 使用 USR2 信号，\n控制 validate 进行缩容停服
+
+super -> super: 检查老进程是否可以关停
+gateway -> super: 老版本的玩家都下线了
+super --> gateway: 准备关停
+
+scene -> super: 老版本的玩家都下线了
+super --> scene: 准备关停
+return 所有老版本玩家下线，可以关停
+super --> gateway!!: 关停 gateway
+super --> scene!!: 关停 scene
+
+
+== 不停服更新结束 ==
+super -> super: 检查状态结束是否通知完成
+super -> new_gateway: 不停服状态结束
+super <-- new_gateway: ack
+super -> new_scene: 不停服状态结束
+super <-- new_scene: ack
+super -> new_record: 不停服状态结束
+super <-- new_record: ack
+return 不停服状态结束通知完成，不停服更新整体流程停止
+
+'运维 -> 运维: 等待所有小服关停老进程
+return 所有小服老进程完毕 
+
+运维 -> validate !!: 关停所有老 validate
+
+@enduml

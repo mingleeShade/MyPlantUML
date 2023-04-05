@@ -1,0 +1,35 @@
+@startuml
+skin rose
+agent game1
+agent game2
+agent bus_proxy1
+
+agent game3
+agent game4
+agent bus_proxy2
+
+agent game5
+agent game6
+agent bus_proxy3
+
+cloud zookeeper
+
+game1 .. bus_proxy1
+game2 .. bus_proxy1 : 共享内存通信
+
+game3 .. bus_proxy2
+game4 .. bus_proxy2
+
+bus_proxy3 .. game5
+bus_proxy3 .. game6
+
+bus_proxy1 -- zookeeper
+bus_proxy2 -- zookeeper
+zookeeper -- bus_proxy3
+
+bus_proxy1 - bus_proxy2 : bus_proxy 之间两两互联
+bus_proxy1 -- bus_proxy3
+bus_proxy2 -- bus_proxy3
+
+
+@enduml
