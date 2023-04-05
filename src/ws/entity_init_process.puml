@@ -1,0 +1,47 @@
+@startuml
+skin rose
+class Entity {
+}
+class Service {
+}
+class ServiceState {
+}
+class PlayerManagerGenerated {
+}
+class ServiceMeshBackend {
+}
+class Proxy {
+}
+class ProxyState {
+}
+
+class CoordinatorProxy { 
+}
+
+class PlayerProxy {
+}
+
+class ServiceComponent {
+}
+class ServiceMeshProxy  {
+- std::unique_ptr<HashSlotProxy> hsp_
+- MailboxMap instance_map_
+- MailboxVec instance_vec_
+}
+note bottom: 管理 mailBox 和 哈希槽, \n根据不同的路由方式发送消息
+
+class HashSlotProxy {
+}
+note bottom: 缓存哈希槽
+
+Entity <|-- Service
+Service *-> ServiceState
+Service <|-- PlayerManagerGenerated
+PlayerManagerGenerated *-> ServiceMeshBackend
+Proxy <|-- CoordinatorProxy
+ProxyState <-* Proxy
+Proxy <|-- PlayerProxy
+ServiceComponent <|-- ServiceMeshProxy
+ServiceMeshProxy *-> HashSlotProxy
+PlayerProxy *-> ServiceMeshProxy
+@enduml
