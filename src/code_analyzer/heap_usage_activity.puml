@@ -1,0 +1,13 @@
+@startuml
+' 通用设置
+skin rose
+
+(*)-->"heap_command(const char *args, int from_tty)" as heap_command
+
+heap_command-->"heap_command_impl(char* args)" as heap_command_impl
+
+heap_command_impl--> "calc_heap_usage(char *expr)" as calc_heap_usage
+
+calc_heap_usage--> "calc_aggregate_size(\n    const struct object_reference *ref, \n    size_t var_len,\n    bool all_reachable_blocks,\n    std::vector<struct reachable_block>& inuse_blocks,\n    size_t *aggr_size,\n    unsigned long *count)" 
+
+@enduml

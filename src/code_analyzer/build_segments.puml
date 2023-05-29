@@ -1,0 +1,28 @@
+@startuml
+skin rose
+
+(*) --> if "g_segments && g_segment_count" then
+    -->[true] "release_all_segmentsrelease"
+else
+endif
+--> if "target_has_execution" then
+    note right: 判断是否为正在运行的程序
+    -->[true] "linux_nat_find_memory_regions"
+    note left: 读取/proc/{pid}/maps文件，\n解析 segment
+    -->add_one_segment
+else
+endif
+
+-->[false] if "core_bfd && core_bfd->xvec->flavour == bfd_target_elf_flavour"
+    note right: 是否为core文件且为elf格式
+    -->[true] "遍历elf中的Program header" as bianli
+    -left->add_one_segment
+    bianli-->mmap_core_file
+    note right: 遍历core文件修正segment，\n主要是m_fsize以及m_faddr
+else
+endif
+--> "验证 segments"
+--> "遍历所有的sections设置segments的类型和mode_name"
+--> "标注各个线程的堆栈segment"
+
+@enduml

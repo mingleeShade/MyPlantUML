@@ -1,0 +1,25 @@
+@startuml
+skin rose
+
+(*)--> ===Bar1===
+===Bar1=== --> heap_command
+===Bar1=== --> ref_command
+===Bar1=== --> parttern_command
+===Bar1=== --> segment_command
+===Bar1=== --> switch_heap_command
+===Bar1=== --> decode_command
+===Bar1=== --> shrobj_command
+===Bar1=== --> obj_command
+
+heap_command --> "update_memory_segments_and_heaps" as update
+ref_command  --> update
+parttern_command --> update
+segment_command --> update
+decode_command --> update
+shrobj_command --> update
+obj_command --> update
+switch_heap_command --> update
+
+update --> build_segments
+update --> init_heap_managers
+@enduml

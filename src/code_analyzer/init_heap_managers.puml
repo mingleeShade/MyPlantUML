@@ -1,0 +1,6 @@
+@startuml
+skin rose
+
+' 这里主要以 tcmalloc 为例
+(*) --> 1
+@enduml
