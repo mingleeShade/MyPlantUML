@@ -3,37 +3,40 @@
 skin rose
 
 ' 状态定义
-state RunningState: Super 正常运行状态
-state ProcessSwitch_StartNew: 等待至少一组新版本进程接入
-state ProcessSwitch_RecordSwitch: 开始执行 record 的切换工作
+state Idle: Super 正常运行状态
+state WaitNewProcess: 等待至少一组新版本进程接入
+state NotifyState: 通知OldScene、OldGateway\n即将进入不停服更新状态
+state TransRecordData: 转移 OldRecord 数据\n到 NewRecord
+state RecordSwitch: OldScene、OldGateway\n切换连接到NewRecord
+state RecycleRecord: 回收OldRecord
 state choice <<choice>>
-state ProcessSwitch_Testing: QA 冒烟测试阶段，全服新旧切换前\n用来给 QA 同学进行测试
-state ProcessSwitch_Coexist: 新老进程共存阶段，\n此时会侦测玩家在线情况，\n如下几种情况会导致状态转换:\n1.全部老玩家下线\n2.运维指令\n3.到了设定时间
-state ProcessSwitch_Recyce: 资源回收阶段
+state SmokeTest: QA 冒烟测试阶段，全服新旧切换前\n用来给 QA 同学进行测试
+state Coexist: 新老进程共存阶段，\n此时会侦测玩家在线情况，\n如下几种情况会导致状态转换:\n1.全部老玩家下线\n2.运维指令\n3.到了设定时间
+state Recycle: 资源回收阶段
 
 
 ' 状态流转
-[*] --> RunningState
-RunningState-->ProcessSwitch_StartNew: 运维发起信号，即将进入新旧切换
-RunningState <-- ProcessSwitch_StartNew: 回退
+'[*] --> Idle
+Idle --> WaitNewProcess: 运维发起信号 40，\n开始等待新进程开启
 
-ProcessSwitch_StartNew-->ProcessSwitch_RecordSwitch: 一组进程就绪，可以开始切换
+WaitNewProcess-->NotifyState: 一组新进程就绪，\n通知OldScene、OldGateway
 
-RunningState <--ProcessSwitch_RecordSwitch: 回退
+NotifyState --> TransRecordData: 通知 OldRecord 开始转移数据
 
-ProcessSwitch_RecordSwitch --> choice: 完成切换工作，进行下一步前\n先判断当前是否是冒烟服
-choice --> ProcessSwitch_Testing: 是冒烟服
-ProcessSwitch_RecordSwitch <-- ProcessSwitch_Testing: 回退
+TransRecordData --> RecordSwitch: 数据转移成功，开始让\nOldScene、OldGateway 切换
+
+RecordSwitch --> RecycleRecord: Record切换成功，\n开始回收OldRecord
+
+RecycleRecord --> choice: 完成切换工作，进行下一步前\n先判断当前是否是冒烟服
+choice --> SmokeTest: 是冒烟服
 
 
-choice --> ProcessSwitch_Coexist: 不是冒烟服
-ProcessSwitch_RecordSwitch <-- ProcessSwitch_Coexist: 回退
+choice --> Coexist: 不是冒烟服
 
-ProcessSwitch_Testing -> ProcessSwitch_Coexist: 冒烟结束
+SmokeTest -> Coexist: 冒烟结束，\n运维发送停止冒烟指令
 
-ProcessSwitch_Coexist --> ProcessSwitch_Recyce: 满足切换条件，\n将残余玩家踢下线\n并且关停老进程
+Coexist --> Recycle: 满足切换条件，\n将残余玩家踢下线\n并且关停老进程
 
-ProcessSwitch_Recyce -up-> RunningState: 回归正常状态
-ProcessSwitch_Recyce --> ProcessSwitch_RecordSwitch: 回退
+Recycle -up-> Idle: 回归正常状态
 
 @enduml

@@ -1,0 +1,27 @@
+@startuml
+skin rose
+struct symbol
+{
+    + struct type* m_type
+    + struct symtab* symtab
+    + struct gdbarch* arch
+    + domain_enum_tag m_domain
+    + uint32 m_aclass_index
+    + uint32 m_is_objfile_owned
+    + uint32 m_is_argument
+    + uint32 m_is_inlined
+    + uint32 maybe_copied
+    + symbol_subclass_kind subclass
+    + bool artificial
+    + uint16 m_line
+    + void* aux_value
+    + struct symbol* hash_next
+
+    + unsigned int aclass_index ()
+    + void set_aclass_index (unsigned int aclass_index)
+    + const symbol_impl &impl () const
+    + address_class aclass () const
+    + domain_enum domain () const
+}
+
+@enduml

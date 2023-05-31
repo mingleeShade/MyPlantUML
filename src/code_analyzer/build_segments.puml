@@ -3,7 +3,9 @@ skin rose
 
 (*) --> if "g_segments && g_segment_count" then
     -->[true] "release_all_segmentsrelease"
+    --> "判断是否为正在运行的程序" as execution
 else
+    --> execution
 endif
 --> if "target_has_execution" then
     note right: 判断是否为正在运行的程序
@@ -11,17 +13,18 @@ endif
     note left: 读取/proc/{pid}/maps文件，\n解析 segment
     -->add_one_segment
 else
+    -->[false] "判断目标是否为core文件且为elf格式" as core
 endif
 
--->[false] if "core_bfd && core_bfd->xvec->flavour == bfd_target_elf_flavour"
-    note right: 是否为core文件且为elf格式
+core --> if "core_bfd && core_bfd->xvec->flavour == bfd_target_elf_flavour"
     -->[true] "遍历elf中的Program header" as bianli
-    -left->add_one_segment
-    bianli-->mmap_core_file
+    -->add_one_segment
+    bianli-->"mmap_core_file" as mmap
     note right: 遍历core文件修正segment，\n主要是m_fsize以及m_faddr
 else
+    -->(*)
 endif
---> "验证 segments"
+mmap --> "验证 segments"
 --> "遍历所有的sections设置segments的类型和mode_name"
 --> "标注各个线程的堆栈segment"
 
