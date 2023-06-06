@@ -1,4 +1,4 @@
-@startuml
+@startuml heap_usage_activity
 ' 通用设置
 skin rose
 
@@ -8,6 +8,8 @@ heap_command-->"heap_command_impl(char* args)" as heap_command_impl
 
 heap_command_impl--> "calc_heap_usage(char *expr)" as calc_heap_usage
 
-calc_heap_usage--> "calc_aggregate_size(\n    const struct object_reference *ref, \n    size_t var_len,\n    bool all_reachable_blocks,\n    std::vector<struct reachable_block>& inuse_blocks,\n    size_t *aggr_size,\n    unsigned long *count)" 
+calc_heap_usage-->"解析表达式, 获取 value"
+
+--> "calc_aggregate_size(\n    const struct object_reference *ref, \n    size_t var_len,\n    bool all_reachable_blocks,\n    std::vector<struct reachable_block>& inuse_blocks,\n    size_t *aggr_size,\n    unsigned long *count)" 
 
 @enduml

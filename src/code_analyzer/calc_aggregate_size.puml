@@ -1,4 +1,4 @@
-@startuml
+@startuml calc_aggregate_size
 ' 通用设置
 skin rose
 

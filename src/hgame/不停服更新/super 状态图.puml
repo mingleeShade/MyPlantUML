@@ -1,4 +1,4 @@
-@startuml
+@startuml super 状态图
 ' 基础设置
 skin rose
 

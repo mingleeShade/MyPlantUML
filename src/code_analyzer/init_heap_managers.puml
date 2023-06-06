@@ -1,4 +1,4 @@
-@startuml
+@startuml init_heap_managers
 skin rose
 
 ' 这里主要以 tcmalloc 为例

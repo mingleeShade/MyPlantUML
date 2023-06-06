@@ -1,4 +1,4 @@
-@startuml
+@startuml init_segments_and_heaps
 skin rose
 
 (*)--> ===Bar1===

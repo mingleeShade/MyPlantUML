@@ -1,5 +1,118 @@
-@startuml
+@startuml 类图
 skin rose
+
+enum type_code
+{
+    TYPE_CODE_BITSTRING
+    TYPE_CODE_UNDEF
+    TYPE_CODE_PTR
+    TYPE_CODE_ARRAY
+    TYPE_CODE_STRUCT
+    TYPE_CODE_UNION
+    TYPE_CODE_ENUM
+    TYPE_CODE_FLAGS
+    TYPE_CODE_FUNC
+    TYPE_CODE_INT
+    TYPE_CODE_FLT
+    TYPE_CODE_VOID
+    TYPE_CODE_SET
+    TYPE_CODE_RANGE
+    TYPE_CODE_STRING
+    TYPE_CODE_ERROR
+    TYPE_CODE_METHOD
+    TYPE_CODE_METHODPTR
+    TYPE_CODE_MEMBERPTR
+    TYPE_CODE_REF
+    TYPE_CODE_RVALUE_REF
+    TYPE_CODE_CHAR
+    TYPE_CODE_BOOL
+    TYPE_CODE_COMPLEX
+    TYPE_CODE_TYPEDEF
+    TYPE_CODE_NAMESPACE
+    TYPE_CODE_DECFLOAT
+    TYPE_CODE_MODULE
+    TYPE_CODE_INTERNAL_FUNCTION
+    TYPE_CODE_XMETHOD
+    TYPE_CODE_FIXED_POINT
+    TYPE_CODE_NAMELIST
+}
+note bottom: 定义在 gdb/gdbtypes.h 中，\n 定义不同的数据类型
+
+struct main_type
+{
+    + type_code code
+    + unsigned int m_flag_unsigned
+    + unsigned int m_flag_nosign
+    + unsigned int m_flag_stub
+    + unsigned int m_flag_target_stub
+    + unsigned int m_flag_prototyped
+    + unsigned int m_flag_varargs
+    + unsigned int m_flag_vector
+    + unsigned int m_flag_stub_supported
+    + unsigned int m_flag_gnu_ifunc
+    + unsigned int m_flag_fixed_instance
+    + unsigned int m_flag_objfile_owned
+    + unsigned int m_flag_endianity_not_default
+    + unsigned int m_flag_declared_class
+    + unsigned int m_flag_flag_enum
+    + type_specific_kind type_specific_field
+    + short nfields
+    + const char *name
+    + union type_owner m_owner;
+    + struct type *target_type;
+    + union 
+    {
+        struct field *fields;
+        struct range_bounds *bounds;
+        struct type *complex_type;
+    } flds_bnds;
+    + union type_specific type_specific;
+    + struct dynamic_prop_list *dyn_prop_list
+}
+struct field {}
+enum type_specific_kind {} 
+struct range_bounds {}
+
+main_type o->type_code
+main_type o--> type_specific_kind
+main_type o-->field
+main_type o-->range_bounds
+
+struct type
+{
+    + struct type* pointer_type
+    + struct type* reference_type
+    + struct type* rvalue_reference_type
+    + struct type* chain
+    + unsigned align_log2
+    + unsigned m_instance_flags
+    + ULONGEST length
+    + struct main_type *main_type
+}
+note bottom: 位于 gdb/gdbtypes.h，\n 对数据类型的抽象
+note right of type::pointer_type
+    指向该类型的指针的type对象指针，
+    该type对象的类型肯定为 TYPE_CODE_PTR
+end note
+note right of type::reference_type
+    指向该类型的引用的type对象指针，
+    该type对象的类型肯定为 TYPE_CODE_REF
+end note
+note right of type::rvalue_reference_type
+    指向该类型的右值引用的type对象指针，
+    该type对象的类型肯定为 TYPE_CODE_RVALUE_REF
+end note
+note left of type::chain
+    变体链。指向仅限定符或者长度与此类型不同的类型。
+    可能的限定符有 const、volatile、code-space、data-space
+    以及 address class。
+end note
+note left of type::main_type
+    核心类型，由一组特定类型共享
+end note
+type *-->main_type
+main_type o--> type
+
 struct symbol
 {
     + struct type* m_type
@@ -16,12 +129,157 @@ struct symbol
     + uint16 m_line
     + void* aux_value
     + struct symbol* hash_next
-
-    + unsigned int aclass_index ()
-    + void set_aclass_index (unsigned int aclass_index)
-    + const symbol_impl &impl () const
-    + address_class aclass () const
-    + domain_enum domain () const
 }
+symbol o--> type
+
+struct general_symbol_info
+{
+    + const char* m_name
+    + LONGEST ivalue
+    + const struct block* block
+    + const gdb_byte* bytes
+    + CORE_ADDR address
+    + const struct common_block* common_block
+    + symbol* chain
+    + obstack* obstack
+    + demangled_name
+    + language m_language
+}
+
+enum language
+{
+    language_unknown,	/* Language not known */
+    language_auto,		/* Placeholder for automatic setting */
+    language_c,			/* C */
+    language_objc,		/* Objective-C */
+    language_cplus,		/* C++ */
+    language_d,			/* D */
+    language_go,			/* Go */
+    language_fortran,		/* Fortran */
+    language_m2,		/* Modula-2 */
+    language_asm,		/* Assembly language */
+    language_pascal,		/* Pascal */
+    language_opencl,		/* OpenCL */
+    language_rust,		/* Rust */
+    language_minimal,		/* All other languages, minimal support only */
+    language_ada,		/* Ada */
+    nr_languageslanguage_unknow
+
+}
+
+enum storage_type
+{
+    ENUM_UNKNOWN
+	ENUM_REGISTER
+	ENUM_STACK
+	ENUM_MODULE_TEXT
+	ENUM_MODULE_DATA
+	ENUM_HEAP
+	ENUM_ALL
+}
+
+struct ca_segment
+{
+	+ address_t m_vaddr;	// virtual address in the target process
+	+ size_t    m_vsize;	// size of the virtual memory segment
+	+ char*     m_faddr;	// mmapped address in the host process core_ananlyzer
+	+ size_t    m_fsize;	// corresponding size in the core file
+	+ enum storage_type m_type;
+	+ unsigned int m_bitvec_ready:1;	// indicating the bit vector is initialized
+	+ unsigned int m_read:1;
+	+ unsigned int m_write:1;
+	+ unsigned int m_exec:1;
+	+ unsigned int m_reserved:28;
+	+ unsigned int* m_ptr_bitvec;		// bit vector of addressable pointers
+	+ struct ca_thread m_thread;
+	+ const char*   m_module_name;
+}
+ca_segment o--> storage_type
+
+struct object_reference
+{
+    '0 is referenced, 1 means direct ref,
+    '2 stands for 2nd level indirect ref, and so on
+	+ int       level
+    ' I am a reference to the object in this slot
+	+ int       target_index
+	+ enum storage_type  storage_type;
+	+ address_t vaddr
+	+ address_t value
+	+ union
+	{
+	    struct reg_ref       reg;
+		struct stack_ref     stack;
+		struct module_ref    module;
+		struct heap_ref      heap;
+		struct anon_ref      target;
+	} where
+}
+object_reference o--> storage_type
+object_reference o--> reg_ref
+object_reference o--> stack_ref
+object_reference o--> module_ref
+object_reference o--> heap_ref
+object_reference o--> anon_ref
+
+struct inuse_block
+{
+    address_t addr
+    size_t size
+}
+
+struct reachable_block
+{
+    + size_t aggr_size
+    + unsigned long aggr_count
+    + unsigned int* index_map
+}
+note left: 
+reachable_block --|> inuse_block
+
+struct reg
+{
+    int regnum
+    struct frame_id next_frame_id
+}
+
+struct computed
+{
+    const struct lval_funcs *funcs
+    void *closure
+}
+
+struct value
+{
+    + enum lval_type lval
+    + unsigned int modifiable
+    + unsigned int lazy
+    + unsigned int initialized
+    + unsigned int stack
+    + bool is_zero
+    + union
+    {
+        CORE_ADDR address
+        struct reg
+        struct internalvar* internalvar
+        struct xmethod_worker* xm_worker
+        struct computed computed
+    } location
+    + LONGEST offset
+    + LONGEST bitsize
+    + LONGEST bitpos
+    + int reference_count
+    value_ref_ptr parent
+    + struct type *type
+    + struct type *enclosing_type
+    + LONGEST embedded_offset
+    + LONGEST pointed_to_offset
+    + gdb::unique_xmalloc_ptr<gdb_byte> contents
+    + std::vector<range> unavailable
+    + std::vector<range> optimized_out
+}
+value o-->reg
+value o-->computed
+value o-->type
 
 @enduml
