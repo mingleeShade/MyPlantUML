@@ -9,7 +9,13 @@ heap_command-->"heap_command_impl(char* args)" as heap_command_impl
 heap_command_impl--> "calc_heap_usage(char *expr)" as calc_heap_usage
 
 calc_heap_usage-->"解析表达式, 获取 value"
-
---> "calc_aggregate_size(\n    const struct object_reference *ref, \n    size_t var_len,\n    bool all_reachable_blocks,\n    std::vector<struct reachable_block>& inuse_blocks,\n    size_t *aggr_size,\n    unsigned long *count)" 
+--> "根据 value 获取 type"
+--> "根据 type 的不同，填充 object_reference, 重点在于 ref.vaddr"
+--> "建立一个 inuse_block 数组"
+--> "调用calc_aggregate_size, 其原型如下：\ncalc_aggregate_size(\n    const struct object_reference *ref, \n    size_t var_len,\n    bool all_reachable_blocks,\n    std::vector<struct reachable_block>& inuse_blocks,\n    size_t *aggr_size,\n    unsigned long *count)" 
+note bottom
+    给定一个指向一个已知大小的内存块的引用、变量或者指针，
+    返回其可达的 in-use block 的聚合大小
+end note
 
 @enduml

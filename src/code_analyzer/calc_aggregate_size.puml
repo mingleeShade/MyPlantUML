@@ -2,5 +2,51 @@
 ' 通用设置
 skin rose
 
+start
 
+note left
+    给定一个指向一个已知大小的内存块的引用、变量或者指针，
+    返回其可达的 in-use block 的聚合大小
+end note
+
+
+partition "根据存储类型计算出遍历的\n起始地址cursor和结束地址end" {
+    if (如果存储类型是寄存器或者堆) then (true)
+        :查找 object_reference \n指向的 reachable_block;
+        if (如果 all_rachable_blocks 且有缓存) then (true)
+            :返回缓存;
+            stop
+        else (false)
+            :遍历的起始地址和结束地址指向\n reachable_block 的头和尾;
+        endif
+    else (false)
+        if (如果 all_rachable_blocks && 变量长度是指针大小) then (true)
+            :根据 object_reference 的虚拟内存地址计算 mmapped address;
+            :查找 mapped address 指向的 reachable_block;
+            if (如果有缓存) then (true)
+                :返回缓存;
+                stop
+            else (false)
+            endif
+        else (false)
+        endif
+        :遍历的起始地址和结束地址指向\n object_reference 的头和尾;
+    endif
+}
+
+
+partition "遍历 cursor，查找对应的\n reachable_block，累计其大小" {
+    :计算 cursor (目标进程地址)对应的\n mmapped address(core anayzer进程地址);
+    :根据 mapped address 查找 reachable_block;
+    if (如果 all_rachable_blocks) then (true)
+        :遍历 reachable_block 的地址范围，\n寻找每一个地址直接或间接关联到的\n block，累计其大小;
+    else (false)
+        :累计 reachable_block 的大小;
+    endif
+}
+
+
+:判断是否可以缓存结果;
+
+end
 @enduml

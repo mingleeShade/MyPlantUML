@@ -1,0 +1,87 @@
+@startuml obj_command
+skin rose
+
+start
+
+:update_memory_segments_and_heaps();
+
+:解析命令参数;
+
+:调用 search_cplusplus_objects_and_references();
+
+partition search_cplusplus_objects_and_references {
+    :获取表达式的虚表\n get_vtable_from_exp();
+    partition get_vtable_from_exp {
+        :根据表达式获取类型 type;
+        :如果类型是 PTR 或者 REF，\n获取其指向对象的 type;
+        if (如果类型是 STRUCT 且 type->name() 存在) then (true)
+            :查找虚表符号\n lookup_minimal_symbol();
+            :根据 minimal_symbol \n获取虚表地址范围;
+            :返回 true;
+        else (false)
+            :返回 false;
+            stop
+        endif
+    }
+
+    :调用 search_value_internal();
+    partition search_value_internal {
+        :lbFound = false;
+        repeat :遍历 g_segments;
+            if (如果 segment 类型为 STACK) then (true)
+                :先从寄存器中找引用对象\n search_registers;
+                if (如果找到了) then (true)
+                    :lbFound = true;
+                else (false)
+                endif
+            else (false)
+            endif
+            if (如果是运行中的进程) then (true)
+                :计算 segment->m_faddr\n (host 进程地址);
+            else (false)
+            endif
+            repeat :扫描单个 segment 内存;
+                :在本 segment 中搜索指向虚表的指针\nsearch_value_by_range;
+                partition search_value_by_range {
+                    if (如果没有设置 segment->m_ptr_bitvec) then (true)
+                        :设置 segment->m_ptr_bitvec;
+                        note left
+                            遍历 segment，
+                            判断每一个8字节地址，
+                            是否为指向自己的指针
+                            或者指向其他
+                             segment 的指针
+                        end note
+                    else (false)
+                    endif
+                    :遍历每一个有效指针;
+                    note left
+                        指针的地址是目标进程的地址
+                    end note
+                    :判断其是否落在传入的虚表地址范围;
+                    if (找到了？) then (true)
+                        :返回找到的地址;
+                    else (false)
+                        :继续遍历有效地址，\n直到找到或者遍历完为止;
+                    endif
+                }
+                if (search_value_by_range 找到了) then (false)
+                    break
+                else (true)
+                    :根据 segment 的类型填充\n object_reference;
+                    :object_reference填充进\n ref_list 中;
+                    :lbFound = true;
+                    :从下一个有效指针开始继续找\nsearch_value_by_range;
+                endif
+            repeat while (继续遍历 segment?)
+        repeat while (继续遍历 g_segments?)
+        :return lbFound;
+    }
+    if (search_value_internal 找到了) then (true)
+        :遍历并 ref_list，\n并打印每个 object_reference;
+    else (false)
+    endif
+}
+
+end
+@enduml

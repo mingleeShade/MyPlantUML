@@ -113,11 +113,230 @@ end note
 type *-->main_type
 main_type o--> type
 
+struct general_symbol_info
+{
+    ' Name of the symbol.  This is a required field.  Storage for the
+    '  name is allocated on the objfile_obstack for the associated
+    '  objfile.  For languages like C++ that make a distinction between
+    '  the mangled name and demangled name, this is the mangled
+    '  name.
+    + const char* m_name
+    '  Value of the symbol.  Which member of this union to use, and what
+    '  it means, depends on what kind of symbol this is and its
+    '  SYMBOL_CLASS.  See comments there for more details.  All of these
+    '  are in host byte order (though what they point to might be in
+    '  target byte order, e.g. LOC_CONST_BYTES).
+    + union {
+        LONGEST ivalue
+        const struct block* block
+        const gdb_byte* bytes
+        CORE_ADDR address
+        const struct common_block* common_block
+        symbol* chain
+    } value
+    + union {
+        obstack* obstack
+        const char* demangled_name
+    } language_specific
+    + language m_language
+    ' This is only used by Ada.  If set, then the 'demangled_name' field
+    '  of language_specific is valid.  Otherwise, the 'obstack' field is
+    '  valid.
+    + unsigned int ada_mangled
+    + short m_section
+    ' ====函数====
+    const char *linkage_name () const
+}
+note left of general_symbol_info::m_name
+    m_name是general_symbol_info结构体中的一个字段，用于存储符号的名称。
+    这个字段是必需的，因为符号的名称是用于标识符号的基本信息。
+    在GDB中，符号的名称分为两种，即Mangled Name和Demangled Name。
+    对于C++等语言，有时需要将符号名称进行编码，以便可以区分不同的函数重载或者名称空间。
+    这个过程就称为name mangling（名称编码）。
+    因此，Mangled Name是编码后的符号名称，而Demangled Name是解码后的符号名称。
+    在这里，m_name字段存储的是Mangled Name。
+    此外，符号名称的存储空间是在objfile_obstack上分配的，
+    这是与objfile相关的堆栈。这样做是为了方便在GDB的内部数据结构中管理符号信息。
+end note
+
+enum minimal_symbol_type
+{
+    mst_unknown
+    mst_text
+    mst_text_gnu_ifunc
+    mst_data_gnu_ifunc
+    mst_slot_got_plt
+    mst_data
+    mst_bss
+    mst_abs
+    mst_solib_trampoline
+    mst_file_text
+    mst_file_data
+    mst_file_bss
+    nr_minsym_types
+}
+
+struct minimal_symbol
+{
+    + unsigned long size
+    + const char *filename
+    + minimal_symbol_type type
+    + unsigned int created_by_gdb
+    'Two flag bits provided for the use of the target.  */
+    + unsigned int target_flag_1
+    + unsigned int target_flag_2
+    'Nonzero iff the size of the minimal symbol has been set.
+    'Symbol size information can sometimes not be determined, because
+    'the object file format may not carry that piece of information.
+    + unsigned int has_size
+    'For data symbols only, if this is set, then the symbol might be
+     'subject to copy relocation.  In this case, a minimal symbol
+     'matching the symbol's linkage name is first looked for in the
+     'main objfile.  If found, then that address is used; otherwise the
+     'address in this symbol is used.  */
+    + unsigned maybe_copied
+    'Non-zero if this symbol ever had its demangled name set (even if
+     'it was set to NULL).  */
+    + unsigned int name_set
+    'Minimal symbols with the same hash key are kept on a linked
+     'list.  This is the link.  */
+    + struct minimal_symbol *hash_next
+    'Minimal symbols are stored in two different hash tables.  This is
+    'the `next' pointer for the demangled hash table.  */
+    + struct minimal_symbol *demangled_hash_next
+}
+minimal_symbol --|> general_symbol_info
+note left of minimal_symbol::maybe_copied
+end note
+
+struct objfile
+{
+/' /* The object file's original name as specified by the user,
+     made absolute, and tilde-expanded.  However, it is not canonicalized
+     (i.e., it has not been passed through gdb_realpath).
+     This pointer is never NULL.  This does not have to be freed; it is
+     guaranteed to have a lifetime at least as long as the objfile.  */ '/
+  + const char *original_name
+  + CORE_ADDR addr_low
+'   /* Some flag bits for this objfile.  */
+  + objfile_flags flags
+'   /* The program space associated with this objfile.  */
+  + struct program_space *pspace
+'   /* List of compunits.
+    '  These are used to do symbol lookups and file/line-number lookups.  */
+  + struct compunit_symtab *compunit_symtabs
+'   /* The object file's BFD.  Can be null if the objfile contains only
+    '  minimal symbols, e.g. the run time common symbols for SunOS4.  */
+  + bfd *obfd
+'   /* The per-BFD data.  Note that this is treated specially if OBFD
+    '  is NULL.  */
+  + struct objfile_per_bfd_storage *per_bfd
+'   /* The modification timestamp of the object file, as of the last time
+    '  we read its symbols.  */
+  + long mtime
+'   /* Obstack to hold objects that should be freed when we load a new symbol
+    '  table from this object file.  */
+  + struct obstack objfile_obstack
+'   /* Structure which keeps track of functions that manipulate objfile's
+'      of the same type as this objfile.  I.e. the function to read partial
+'      symbols for example.  Note that this structure is in statically
+'      allocated memory, and is shared by all objfiles that use the
+'      object module reader of this type.  */
+  + const struct sym_fns *sf
+'   /* The "quick" (aka partial) symbol functions for this symbol
+    '  reader.  */
+  + std::forward_list<quick_symbol_functions_up> qf
+'   /* Per objfile data-pointers required by other GDB modules.  */
+  + struct registry_fields registry_data
+'   /* Set of relocation offsets to apply to each section.
+'      The table is indexed by the_bfd_section->index, thus it is generally
+'      as large as the number of sections in the binary.
+'      These offsets indicate that all symbols (including partial and
+'      minimal symbols) which have been read have been relocated by this
+'      much.  Symbols which are yet to be read need to be relocated by it.  */
+  + ::section_offsets section_offsets
+'   /* Indexes in the section_offsets array.  These are initialized by the
+'      *_symfile_offsets() family of functions (som_symfile_offsets,
+'      xcoff_symfile_offsets, default_symfile_offsets).  In theory they
+'      should correspond to the section indexes used by bfd for the
+'      current objfile.  The exception to this for the time being is the
+'      SOM version.
+'      These are initialized to -1 so that we can later detect if they
+'      are used w/o being properly assigned to.  */
+  + int sect_index_text
+  + int sect_index_data
+  + int sect_index_bss
+  + int sect_index_rodata
+'   /* These pointers are used to locate the section table, which
+'      among other things, is used to map pc addresses into sections.
+'      SECTIONS points to the first entry in the table, and
+'      SECTIONS_END points to the first location past the last entry
+'      in the table.  The table is stored on the objfile_obstack.  The
+'      sections are indexed by the BFD section index; but the
+'      structure data is only valid for certain sections
+'      (e.g. non-empty, SEC_ALLOC).  */
+  + struct obj_section *sections
+  + struct obj_section *sections_end
+'   /* GDB allows to have debug symbols in separate object files.  This is
+'      used by .gnu_debuglink, ELF build id note and Mach-O OSO.
+'      Although this is a tree structure, GDB only support one level
+'      (ie a separate debug for a separate debug is not supported).  Note that
+'      separate debug object are in the main chain and therefore will be
+'      visited by objfiles & co iterators.  Separate debug objfile always
+'      has a non-nul separate_debug_objfile_backlink.  */
+'   /* Link to the first separate debug object, if any.  */
+  + struct objfile *separate_debug_objfile
+'   /* If this is a separate debug object, this is used as a link to the
+'      actual executable objfile.  */
+  + struct objfile *separate_debug_objfile_backlink
+'   /* If this is a separate debug object, this is a link to the next one
+'      for the same executable objfile.  */
+  + struct objfile *separate_debug_objfile_link
+'   /* Place to stash various statistics about this objfile.  */
+  + struct objstats stats
+'   /* A linked list of symbols created when reading template types or
+'      function templates.  These symbols are not stored in any symbol
+'      table, so we have to keep them here to relocate them
+'      properly.  */
+  + struct symbol *template_symbols
+'   /* Associate a static link (struct dynamic_prop *) to all blocks (struct
+'      block *) that have one.
+'      In the context of nested functions (available in Pascal, Ada and GNU C,
+'      for instance), a static link (as in DWARF's DW_AT_static_link attribute)
+'      for a function is a way to get the frame corresponding to the enclosing
+'      function.
+'      Very few blocks have a static link, so it's more memory efficient to
+'      store these here rather than in struct block.  Static links must be
+'      allocated on the objfile's obstack.  */
+  + htab_up static_links;
+'   /* JIT-related data for this objfile, if the objfile is a JITer;
+'      that is, it produces JITed objfiles.  */
+  + std::unique_ptr<jiter_objfile_data> jiter_data
+'   /* JIT-related data for this objfile, if the objfile is JITed;
+'      that is, it was produced by a JITer.  */
+  + std::unique_ptr<jited_objfile_data> jited_data
+'   /* A flag that is set to true if the JIT interface symbols are not
+'      found in this objfile, so that we can skip the symbol lookup the
+'      next time.  If an objfile does not have the symbols, it will
+'      never have them.  */
+  + bool skip_jit_symbol_lookup
+}
+
+struct bound_minimal_symbol
+{
+    + struct minimal_symbol *minsym
+    + struct objfile *objfile
+}
+bound_minimal_symbol *-->minimal_symbol
+bound_minimal_symbol o->objfile
+
 struct symbol
 {
     + struct type* m_type
-    + struct symtab* symtab
-    + struct gdbarch* arch
+    + union {
+        struct symtab* symtab
+        struct gdbarch* arch
+    } owner
     + domain_enum_tag m_domain
     + uint32 m_aclass_index
     + uint32 m_is_objfile_owned
@@ -130,21 +349,8 @@ struct symbol
     + void* aux_value
     + struct symbol* hash_next
 }
+symbol --|> general_symbol_info
 symbol o--> type
-
-struct general_symbol_info
-{
-    + const char* m_name
-    + LONGEST ivalue
-    + const struct block* block
-    + const gdb_byte* bytes
-    + CORE_ADDR address
-    + const struct common_block* common_block
-    + symbol* chain
-    + obstack* obstack
-    + demangled_name
-    + language m_language
-}
 
 enum language
 {
@@ -180,21 +386,66 @@ enum storage_type
 
 struct ca_segment
 {
-	+ address_t m_vaddr;	// virtual address in the target process
-	+ size_t    m_vsize;	// size of the virtual memory segment
-	+ char*     m_faddr;	// mmapped address in the host process core_ananlyzer
-	+ size_t    m_fsize;	// corresponding size in the core file
-	+ enum storage_type m_type;
-	+ unsigned int m_bitvec_ready:1;	// indicating the bit vector is initialized
-	+ unsigned int m_read:1;
-	+ unsigned int m_write:1;
-	+ unsigned int m_exec:1;
-	+ unsigned int m_reserved:28;
-	+ unsigned int* m_ptr_bitvec;		// bit vector of addressable pointers
-	+ struct ca_thread m_thread;
+    'virtual address in the target process
+	+ address_t m_vaddr
+    'size of the virtual memory segment
+	+ size_t    m_vsize
+    'mmapped address in the host process core_ananlyzer
+	+ char*     m_faddr
+    '	corresponding size in the core file
+	+ size_t    m_fsize
+	+ enum storage_type m_type
+    ' indicating the bit vector is initialized
+	+ unsigned int m_bitvec_ready
+	+ unsigned int m_read
+	+ unsigned int m_write
+	+ unsigned int m_exec
+	+ unsigned int m_reserved
+    ' bit vector of addressable pointers
+	+ unsigned int* m_ptr_bitvec
+	+ struct ca_thread m_thread
 	+ const char*   m_module_name;
 }
 ca_segment o--> storage_type
+note left of ca_segment::m_ptr_bitvec
+    标识 segment 中每一个地址是否为可访问指针的数组，
+    数组中的单个元素 int 中的每一个 bit，标识每32个指针是否可访问
+end note
+
+struct reg_ref
+{
+	+ int tid
+	+ int reg_num
+	+ const char* name
+}
+
+struct stack_ref
+{
+	' //ptid_t ptid;	// "Actual process id";
+    ';		// thread id used by debugger
+	+ int tid
+	+ int frame
+	+ int offset
+}
+
+struct module_ref
+{
+	address_t base
+	size_t    size
+	const char* name
+}
+
+struct heap_ref
+{
+	address_t addr
+	size_t    size
+	int       inuse
+}
+
+struct anon_ref
+{
+	size_t size
+}
 
 struct object_reference
 {
@@ -204,23 +455,31 @@ struct object_reference
     ' I am a reference to the object in this slot
 	+ int       target_index
 	+ enum storage_type  storage_type;
+    ' the address that references
 	+ address_t vaddr
+    ' the value at the above address, i.e. the the referenced
 	+ address_t value
 	+ union
 	{
-	    struct reg_ref       reg;
-		struct stack_ref     stack;
-		struct module_ref    module;
-		struct heap_ref      heap;
-		struct anon_ref      target;
+	    struct reg_ref       reg
+		struct stack_ref     stack
+		struct module_ref    module
+		struct heap_ref      heap
+		struct anon_ref      target
 	} where
 }
-object_reference o--> storage_type
+object_reference o-> storage_type
 object_reference o--> reg_ref
 object_reference o--> stack_ref
 object_reference o--> module_ref
 object_reference o--> heap_ref
 object_reference o--> anon_ref
+
+struct object_range
+{
+    + address_t low
+    + address_t high
+}
 
 struct inuse_block
 {
