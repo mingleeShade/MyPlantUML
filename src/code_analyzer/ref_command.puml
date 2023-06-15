@@ -1,6 +1,7 @@
 @startuml ref_command
 skin rose
 start
-if (是否指定了)
+if (是否指定了线程) then (true)
+endif
 end
 @enduml
