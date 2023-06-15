@@ -2,29 +2,36 @@
 skin rose
 
 ' 这里主要以 tcmalloc 为例
-(*) --> "注册各种方法" as register
+start
+:注册各种方法;
 note right: 比如 init_heap、heap_walk、get_biggest_blocks等
--->"init_heap" as init
-init-> "初始化 g_spans"
--->"gdb_symbol_prelude" as symbol
-symbol -> "设置 pagemap symbol"
-symbol --> parse_config
+partition init_heap {
+    :初始化 g_spans;
+    :gdb_symbol_prelude;
+    :设置 pagemap symbol;
+    partition parse_config {
+        :寻找kPageShift符号;
+        :获取kPageShift变量;
+        :获取tcmalloc::Static::sizemap_sizemap_符号;
+        :获取sizemap_变量;
+        :获取class_to_size_变量;
+        :初始化g_config.sizemap.class_to_size;
+        :class_to_size拷贝到g_config.sizemap.class_to_size;
+    }
 
-parse_config-> "寻找kPageShift符号" as kPageShift
-kPageShift --> "获取kPageShift变量" as GetPageShift
-GetPageShift --> "获取tcmalloc::Static::sizemap_sizemap_符号"
--->"获取sizemap_变量"
--->"获取class_to_size_变量"
--->"初始化g_config.sizemap.class_to_size"
--->"class_to_size拷贝到g_config.sizemap.class_to_size"
+    partition parse_pagemap {
 
-parse_config-->parse_pagemap
--left->"123"
--->12122
--->ssss
+    }
 
-parse_pagemap-->parse_thread_cache
+    partition parse_thread_cache {
 
-parse_thread_cache-->parse_central_cache" as central
+    }
+
+    partition parse_central_cache {
+
+    }
+}
+
+end
 
 @enduml

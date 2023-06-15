@@ -69,6 +69,7 @@ partition search_cplusplus_objects_and_references {
                     break
                 else (true)
                     :根据 segment 的类型填充\n object_reference;
+                    :如果 segment 是 heap，\n则根据找到的地址查找对应的 block，\n填充进 object_reference;
                     :object_reference填充进\n ref_list 中;
                     :lbFound = true;
                     :从下一个有效指针开始继续找\nsearch_value_by_range;
@@ -78,7 +79,7 @@ partition search_cplusplus_objects_and_references {
         :return lbFound;
     }
     if (search_value_internal 找到了) then (true)
-        :遍历并 ref_list，\n并打印每个 object_reference;
+        :遍历 ref_list，\n并打印每个 object_reference;
     else (false)
     endif
 }

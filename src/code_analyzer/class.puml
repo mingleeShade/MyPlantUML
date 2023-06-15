@@ -1,6 +1,15 @@
 @startuml 类图
 skin rose
 
+struct expression
+{
+  ' /* Language it was entered in.  */
+  + const struct language_defn *language_defn
+  ' /* Architecture it was parsed in.  */
+  + struct gdbarch *gdbarch
+  + expr::operation_up op
+}
+
 enum type_code
 {
     TYPE_CODE_BITSTRING
@@ -508,37 +517,104 @@ struct computed
     void *closure
 }
 
+enum lval_type
+{
+  ' /* * Not an lval.  */
+  not_lval
+  ' /* * In memory.  */
+  lval_memory
+  ' /* * In a register.  Registers are relative to a frame.  */
+  lval_register
+  ' /* * In a gdb internal variable.  */
+  lval_internalvar
+  ' /* * Value encapsulates a callable defined in an extension language.  */
+  lval_xcallable
+  ' /* * Part of a gdb internal variable (structure field).  */
+  lval_internalvar_component
+  ' /* * Value's bits are fetched and stored using functions provided
+      ' by its creator.  */
+  lval_computed
+}
+
 struct value
 {
-    + enum lval_type lval
-    + unsigned int modifiable
-    + unsigned int lazy
-    + unsigned int initialized
-    + unsigned int stack
-    + bool is_zero
-    + union
-    {
-        CORE_ADDR address
-        struct reg
-        struct internalvar* internalvar
-        struct xmethod_worker* xm_worker
-        struct computed computed
-    } location
-    + LONGEST offset
-    + LONGEST bitsize
-    + LONGEST bitpos
-    + int reference_count
-    value_ref_ptr parent
-    + struct type *type
-    + struct type *enclosing_type
-    + LONGEST embedded_offset
-    + LONGEST pointed_to_offset
-    + gdb::unique_xmalloc_ptr<gdb_byte> contents
-    + std::vector<range> unavailable
-    + std::vector<range> optimized_out
+  + enum lval_type lval
+  + unsigned int modifiable
+  + unsigned int lazy
+  + unsigned int initialized
+  + unsigned int stack
+  + bool is_zero
+  + union
+  {
+    CORE_ADDR address
+    struct reg reg
+    struct internalvar* internalvar
+    struct xmethod_worker* xm_worker
+    struct computed computed
+  } location
+  + LONGEST offset
+  + LONGEST bitsize
+  + LONGEST bitpos
+  + int reference_count
+  + value_ref_ptr parent
+  + struct type *type
+  + struct type *enclosing_type
+  + LONGEST embedded_offset
+  + LONGEST pointed_to_offset
+  + gdb::unique_xmalloc_ptr<gdb_byte> contents
+  + std::vector<range> unavailable
+  + std::vector<range> optimized_out
 }
 value o-->reg
 value o-->computed
 value o-->type
 
+enum register_status {
+  REG_UNKNOWN
+  REG_VALID
+  REG_UNAVAILABLE
+}
+
+struct reg_buffer_common {
+  + {abstract} register_status get_register_status(int regnum)
+  + {abstract} void raw_supply(int regnum, const void* buf)
+  + {abstract} void raw_collect(int regnum, void* buf)
+  + {abstract} bool raw_compare(int regnum, const void* buf, int offset) const
+}
+reg_buffer_common o--> register_status
+
+struct regcache_descr {
+  ' /* The architecture this descriptor belongs to.  */
+  + struct gdbarch *gdbarch;
+  ' /* The raw register cache.  Each raw (or hard) register is supplied
+  '    by the target interface.  The raw cache should not contain
+  '    redundant information - if the PC is constructed from two
+  '    registers then those registers and not the PC lives in the raw
+  '    cache.  */
+  + long sizeof_raw_registers;
+  ' /* The cooked register space.  Each cooked register in the range
+  '    [0..NR_RAW_REGISTERS) is direct-mapped onto the corresponding raw
+  '    register.  The remaining [NR_RAW_REGISTERS
+  '    .. NR_COOKED_REGISTERS) (a.k.a. pseudo registers) are mapped onto
+  '    both raw registers and memory by the architecture methods
+  '    gdbarch_pseudo_register_read and gdbarch_pseudo_register_write.  */
+  + int nr_cooked_registers;
+  + long sizeof_cooked_registers;
+  ' /* Offset and size (in 8 bit bytes), of each register in the
+  '    register cache.  All registers (including those in the range
+  '    [NR_RAW_REGISTERS .. NR_COOKED_REGISTERS) are given an
+  '    offset.  */
+  + long *register_offset;
+  + long *sizeof_register;
+  ' /* Cached table containing the type of each register.  */
+  + struct type **register_type;
+}
+regcache_descr o--> gdbarch
+regcache_descr o--> type
+
+class reg_buffer {
+  struct regcache_descr* m_descr
+}
+reg_buffer --|> reg_buffer_common
+reg_buffer o--> regcache_descr
 @enduml

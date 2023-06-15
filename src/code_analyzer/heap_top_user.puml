@@ -1,0 +1,54 @@
+@startuml biggest_heap_owners_generic
+skin rose
+
+start
+note right:bool biggest_heap_owners_generic(\n    unsigned int num,\n    bool all_reachable_blocks)
+
+:初始化 heap_owner 数组：__**owners**__;
+
+:构建所有可达的 blocks;
+
+repeat :遍历所有的 segment;
+    if (segment 是 STACK 或者是 DATA 段) then (true)
+        if (segment 是 STACK) then (stack 段)
+            :从 segment 中获取 regs_buf
+                read_registers(
+                    const struct ca_segment* segment,
+                    struct reg_value* regs, int bufsz);
+            repeat :遍历 regs_buf;
+                :寻找 reg_value 对应的 reachable_block
+                    find_reachable_block();
+                :用 reachable_block 构造 object_reference;
+                :计算 object_reference 可达的 block 累计大小
+                    calc_aggregate_size();
+                :使用计算出的大小和 object_reference 构造 heap_owner;
+                :heap_owner 加入 __**owners**__;
+            repeat while (more reg_value?)
+            :读取栈顶指针寄存器 rsp;
+            :根据 rsp 计算遍历地址 **start** 和 **end**;
+        else (data 段)
+            :**start** 和 **end** 赋值为 segment 的地址范围;
+        endif
+        repeat:遍历地址范围 **start~end**;
+            :根据 segment 类型构造 object_reference;
+            :计算 object_reference 可达的 block 累计大小
+                calc_aggregate_size();
+            :使用计算出的大小和 object_reference 构造 heap_owner;
+            :heap_owner 加入 __**owners**__;
+        repeat while (遍历完成？)
+    else (false)
+    endif
+repeat while (more segment?)
+
+repeat :遍历所有的 inuse blocks;
+    :根据 reachable_block 构造 object_reference;
+    :计算 object_reference 可达的 block 累计大小
+        calc_aggregate_size();
+    :使用计算出的大小和 object_reference 构造 heap_owner;
+    :heap_owner 加入 __**owners**__;
+repeat while (遍历完成？)
+
+:打印结果;
+
+end
+@enduml
