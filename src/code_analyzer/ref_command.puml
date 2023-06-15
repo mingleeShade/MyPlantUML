@@ -1,0 +1,6 @@
+@startuml ref_command
+skin rose
+start
+if (是否指定了)
+end
+@enduml
