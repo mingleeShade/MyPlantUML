@@ -331,6 +331,136 @@ struct objfile
   + bool skip_jit_symbol_lookup
 }
 
+struct compunit_symtab
+{
+  + objfile *objfile()
+  + void set_objfile(struct objfile *objfile)
+  + symtab_range filetabs () const
+  + void add_filetab (symtab *filetab)
+  + const char *debugformat () const
+  + void set_debugformat (const char *debugformat)
+  + const char *producer () const
+  + void set_producer (const char *producer)
+  + const char *dirname () const
+  + void set_dirname (const char *dirname)
+  + const struct blockvector *blockvector () const
+  + void set_blockvector (const struct blockvector *blockvector)
+  + int block_line_section () const
+  + void set_block_line_section (int block_line_section)
+  + bool locations_valid () const
+  + void set_locations_valid (bool locations_valid)
+  + bool epilogue_unwind_valid () const
+  + void set_epilogue_unwind_valid (bool epilogue_unwind_valid)
+  + macro_table *macro_table () const
+  + void set_macro_table (struct macro_table *macro_table)
+  ' /* Make PRIMARY_FILETAB the primary filetab of this compunit symtab.
+    '  PRIMARY_FILETAB must already be a filetab of this compunit symtab.  */
+  + void set_primary_filetab (symtab *primary_filetab)
+  ' /* Return the primary filetab of the compunit.  */
+  + symtab *primary_filetab () const
+  ' /* Set m_call_site_htab.  */
+  + void set_call_site_htab (htab_t call_site_htab)
+  ' /* Find call_site info for PC.  */
+  + call_site *find_call_site (CORE_ADDR pc) const
+  ' /* Unordered chain of all compunit symtabs of this objfile.  */
+  + struct compunit_symtab *next
+  ' /* Object file from which this symtab information was read.  */
+  + struct objfile *m_objfile
+  ' /* Name of the symtab.
+  '    This is *not* intended to be a usable filename, and is
+  '    for debugging purposes only.  */
+  + const char *name
+  ' /* Unordered list of file symtabs, except that by convention the "main"
+  '    source file (e.g., .c, .cc) is guaranteed to be first.
+  '    Each symtab is a file, either the "main" source file (e.g., .c, .cc)
+  '    or header (e.g., .h).  */
+  + symtab *m_filetabs
+  ' /* Last entry in FILETABS list.
+  '    Subfiles are added to the end of the list so they accumulate in order,
+  '    with the main source subfile living at the front.
+  '    The main reason is so that the main source file symtab is at the head
+  '    of the list, and the rest appear in order for debugging convenience.  */
+  + symtab *m_last_filetab
+  ' /* Non-NULL string that identifies the format of the debugging information,
+  '    such as "stabs", "dwarf 1", "dwarf 2", "coff", etc.  This is mostly useful
+  '    for automated testing of gdb but may also be information that is
+  '    useful to the user.  */
+  + const char *m_debugformat
+  ' /* String of producer version information, or NULL if we don't know.  */
+  + const char *m_producer
+  ' /* Directory in which it was compiled, or NULL if we don't know.  */
+  + const char *m_dirname
+  ' /* List of all symbol scope blocks for this symtab.  It is shared among
+  '    all symtabs in a given compilation unit.  */
+  + const struct blockvector *m_blockvector
+  ' /* Section in objfile->section_offsets for the blockvector and
+  '    the linetable.  Probably always SECT_OFF_TEXT.  */
+  + int m_block_line_section
+  ' /* Symtab has been compiled with both optimizations and debug info so that
+  '    GDB may stop skipping prologues as variables locations are valid already
+  '    at function entry points.  */
+  + unsigned int m_locations_valid
+  ' /* DWARF unwinder for this CU is valid even for epilogues (PC at the return
+  '    instruction).  This is supported by GCC since 4.5.0.  */
+  + unsigned int m_epilogue_unwind_valid
+  ' /* struct call_site entries for this compilation unit or NULL.  */
+  + htab_t m_call_site_htab
+  ' /* The macro table for this symtab.  Like the blockvector, this
+  '    is shared between different symtabs in a given compilation unit.
+  '    It's debatable whether it *should* be shared among all the symtabs in
+  '    the given compilation unit, but it currently is.  */
+  + struct macro_table *m_macro_table
+  ' /* If non-NULL, then this points to a NULL-terminated vector of
+  '    included compunits.  When searching the static or global
+  '    block of this compunit, the corresponding block of all
+  '    included compunits will also be searched.  Note that this
+  '    list must be flattened -- the symbol reader is responsible for
+  '    ensuring that this vector contains the transitive closure of all
+  '    included compunits.  */
+  + struct compunit_symtab **includes
+  ' /* If this is an included compunit, this points to one includer
+  '    of the table.  This user is considered the canonical compunit
+  '    containing this one.  An included compunit may itself be
+  '    included by another.  */
+  + struct compunit_symtab *user
+} 
+note bottom
+Compunit symtabs contain the actual "symbol table", aka blockvector, as well
+as the list of all source files (what gdb has historically associated with
+the term "symtab").
+Additional information is recorded here that is common to all symtabs in a
+compilation unit (DWARF or otherwise).
+                                                                             
+Example:
+For the case of a program built out of these files:
+                                                                             
+foo.c
+  foo1.h
+  foo2.h
+bar.c
+  foo1.h
+  bar.h
+                                                                             
+This is recorded as:
+
+objfile -> foo.c(cu) -> bar.c(cu) -> NULL
+     |             |
+     v            v
+foo.c 	bar.c
+     |             |
+     v            v
+foo1.h	foo1.h
+     |             |
+     v            v
+foo2.h	bar.h
+     |             |
+     v            v
+NULL	NULL
+                                                                             
+where "foo.c(cu)" and "bar.c(cu)" are struct compunit_symtab objects,
+and the files foo.c, etc. are struct symtab objects. 
+end note
+
 struct bound_minimal_symbol
 {
     + struct minimal_symbol *minsym
@@ -341,50 +471,50 @@ bound_minimal_symbol o->objfile
 
 struct symbol
 {
-    + struct type* m_type
-    + union {
-        struct symtab* symtab
-        struct gdbarch* arch
-    } owner
-    + domain_enum_tag m_domain
-    + uint32 m_aclass_index
-    + uint32 m_is_objfile_owned
-    + uint32 m_is_argument
-    + uint32 m_is_inlined
-    + uint32 maybe_copied
-    + symbol_subclass_kind subclass
-    + bool artificial
-    + uint16 m_line
-    + void* aux_value
-    + struct symbol* hash_next
+  + struct type* m_type
+  + union {
+    struct symtab* symtab
+    struct gdbarch* arch
+  } owner
+  + domain_enum_tag m_domain
+  + uint32 m_aclass_index
+  + uint32 m_is_objfile_owned
+  + uint32 m_is_argument
+  + uint32 m_is_inlined
+  + uint32 maybe_copied
+  + symbol_subclass_kind subclass
+  + bool artificial
+  + uint16 m_line
+  + void* aux_value
+  + struct symbol* hash_next
 }
 symbol --|> general_symbol_info
 symbol o--> type
 
 enum language
 {
-    language_unknown,	/* Language not known */
-    language_auto,		/* Placeholder for automatic setting */
-    language_c,			/* C */
-    language_objc,		/* Objective-C */
-    language_cplus,		/* C++ */
-    language_d,			/* D */
-    language_go,			/* Go */
-    language_fortran,		/* Fortran */
-    language_m2,		/* Modula-2 */
-    language_asm,		/* Assembly language */
-    language_pascal,		/* Pascal */
-    language_opencl,		/* OpenCL */
-    language_rust,		/* Rust */
-    language_minimal,		/* All other languages, minimal support only */
-    language_ada,		/* Ada */
-    nr_languageslanguage_unknow
+  language_unknown,	/* Language not known */
+  language_auto,		/* Placeholder for automatic setting */
+  language_c,			/* C */
+  language_objc,		/* Objective-C */
+  language_cplus,		/* C++ */
+  language_d,			/* D */
+  language_go,			/* Go */
+  language_fortran,		/* Fortran */
+  language_m2,		/* Modula-2 */
+  language_asm,		/* Assembly language */
+  language_pascal,		/* Pascal */
+  language_opencl,		/* OpenCL */
+  language_rust,		/* Rust */
+  language_minimal,		/* All other languages, minimal support only */
+  language_ada,		/* Ada */
+  nr_languageslanguage_unknow
 
 }
 
 enum storage_type
 {
-    ENUM_UNKNOWN
+  ENUM_UNKNOWN
 	ENUM_REGISTER
 	ENUM_STACK
 	ENUM_MODULE_TEXT
@@ -460,9 +590,9 @@ struct object_reference
 {
     '0 is referenced, 1 means direct ref,
     '2 stands for 2nd level indirect ref, and so on
-	+ int       level
+	+ int level
     ' I am a reference to the object in this slot
-	+ int       target_index
+	+ int target_index
 	+ enum storage_type  storage_type;
     ' the address that references
 	+ address_t vaddr
@@ -477,6 +607,17 @@ struct object_reference
 		struct anon_ref      target
 	} where
 }
+note bottom
+  object_reference - 是用来描述对象之间的引用关系
+  level - 描述是几级引用
+  target_index - 如果本 ref 放在了 ref_list 之中时的下标
+  vaddr - 是目标程序的虚拟地址
+  value - 是本虚拟地址指向的值，除 level0 外，其他的 level 存储指向的地址
+  where - 根据存储类型的不同，记录本引用的地址的所在的信息，
+    如果是代码段和数据段则记录段首地址和段大小名字之类，
+    如果是堆段则记录其所在的 block 地址、大小和是否使用标记
+end note
+
 object_reference o-> storage_type
 object_reference o--> reg_ref
 object_reference o--> stack_ref

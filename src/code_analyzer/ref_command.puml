@@ -1,7 +1,12 @@
 @startuml ref_command
 skin rose
 start
-if (是否指定了线程) then (true)
+if (是否仅查找线程栈中的引用) then (仅查找线程)
+://find_object_refs_on_threads()//;
+elseif (是否指定了对象的大小) then (未指定对象大小)
+://find_object_type()//;
+else (指定了对象大小)
+://find_object_refs()//;
 endif
 end
 @enduml

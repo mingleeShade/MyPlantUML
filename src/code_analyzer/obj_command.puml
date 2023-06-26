@@ -9,6 +9,7 @@ start
 
 :调用 search_cplusplus_objects_and_references();
 
+-> 查找 cpp 对象或者引用;
 partition search_cplusplus_objects_and_references {
     :获取表达式的虚表\n get_vtable_from_exp();
     partition get_vtable_from_exp {
@@ -25,6 +26,11 @@ partition search_cplusplus_objects_and_references {
     }
 
     :调用 search_value_internal();
+    note left
+        遍历所有的 segment，
+        寻找指向虚表的地址范围
+        的 object_reference
+    end note
     partition search_value_internal {
         :lbFound = false;
         repeat :遍历 g_segments;
@@ -60,7 +66,8 @@ partition search_cplusplus_objects_and_references {
                     end note
                     :判断其是否落在传入的虚表地址范围;
                     if (找到了？) then (true)
-                        :返回找到的地址;
+                        :返回找到的地址，
+                         找到的 value 为指向的地址;
                     else (false)
                         :继续遍历有效地址，\n直到找到或者遍历完为止;
                     endif

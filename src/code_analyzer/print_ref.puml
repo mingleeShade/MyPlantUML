@@ -1,0 +1,73 @@
+@startuml print_ref
+skin rose
+
+start
+
+if (ref 是 REGISTER) then (ENUM_REGISTER)
+    partition print_register_ref() {
+        :通过 gdbarch 获取 **reg_name**;
+        :打印 **reg_name** 和 **ref** 存储的 值;
+    }
+elseif (ref 是 STACK) then (ENUM_STACK)
+    partition print_stack_ref() {
+        :调用 //get_stack_sym()//，
+        获取 **ref** 对应的符号;
+        note left
+            遍历 **frame**，获取包含当前 **pc**
+            的符号块，遍历符号块中的
+            **symbol**，在当前 **frame** 中，
+            获取符号对应的 **value**，
+            获取该 **value** 的地址，
+            如果其地址包含 **ref** 的地址，
+            则返回该 **symbol**
+        end note
+        :通过符号获取 **type**;
+        :调用 //print_struct_field()//，
+        通过 **ref** 和 **type** 打印类型的名字;
+    }
+elseif (ref 是 TEXT 或 DATA) then ( ENUM_MODULE_TEXT || ENUM_MODULE_DATA)
+    partition print_global_ref() {
+        :根据 **ref** 获取全局符号，并打印符号名;
+    }
+elseif (ref 是 HEAP) then (ENUM_HEAP)
+    partition print_heap_ref() {
+        :调用 //lookup_type_by_addr()// 函数
+        获取地址对应的类型 **type**;
+        note right
+            //lookup_type_by_addr()// 函数
+            主要是从 **addr_type_map**;
+            这个静态变量中获取到预先缓存
+            好的地址到类型的映射。
+            而这个静态变量主要是缓存了
+            之前获取过的类型。
+        end note
+        if (获取到了) then (true)
+            :打印类型;
+        elseif (判断 **ref** 是否为带有虚表的堆对象，同时获取对象名)
+            note right
+                判断是否为带虚表的对象基于以下判断：
+                1. object_reference 如果是堆段，
+                    则其上记录了所在 block 的地址
+                2. 虚表地址会存储在 block 的开头位置
+                3. 可以先假设这个取到的是虚表地址，
+                    先判断该地址对应的 segment 是否
+                    为数据段或者代码段
+                4. 如果是数据段或代码段，则可以找到
+                    对应的符号及其名字
+                另外，//is_heap_object_with_vptr()//
+                函数同时也会获取到类型的对象名
+            end note
+            :通过对象名，获取到符号;
+            :通过符号获取 **type**;
+            :如果很获取到 **type**，就打印
+            **type** 的名字，否则打印之前获
+            取到的类型名;
+            :获取到 **type** 的话，增加地址
+            到 **type** 的缓存;
+        endif
+    }
+else (UNKNOW)
+endif
+
+end
+@enduml

@@ -1,0 +1,69 @@
+@startuml find_object_type
+skin rose
+
+'开始
+start
+
+:根据传入的地址初始化 //object_reference// **ref**：
+ // ref->vaddr = addr//;
+:填充 //object_reference// **ref**，
+ //fill_ref_location(ref)//;
+:加入 **refs** 中;
+
+partition fill_ref_location(object_reference* ref) {
+    :根据 //ref->vaddr// 找到 **segment**;
+    if (//segment->m_type == ENUM_STACK//) then (STACK 段)
+        :填充 stack_ref 中的 线程 id，以及 frame;
+    elseif (//ENUM_MODULE_DATA || ENUM_MODULE_TEXT//) then (DATA 段或 TEXT 段)
+        :使用 segment 的地址、大小和名字，
+        填充 module_ref 的 base addr、
+        size 和 module name;
+    elseif (//是否为 heap 段 &&//
+    //能找到对应的 blcok//) then (HEAP 段)
+        :找到该地址对应的 block;
+        :heap_ref 的地址、大小赋值为 block 的地址和大小;
+    else
+        :未知对象;
+        ://ref->storate_type = ENUM_UNKNOWN//;
+    endif
+}
+
+partition 判断是否需要进行深度搜索 {
+    if (//是 HEAP 段 && inuse && 不带虚表结构//) then (heap && inuse && no vptr)
+        note left
+            判断是否为带虚表的对象基于以下判断：
+            1. object_reference 如果是堆段，
+                则其上记录了所在 block 的地址
+            2. 虚表地址会存储在 block 的开头位置
+            3. 可以先假设这个取到的是虚表地址，
+                先判断该地址对应的 segment 是否
+                为数据段或者代码段
+            4. 如果是数据段或代码段，则可以找到
+                对应的符号及其名字
+            另外，//is_heap_object_with_vptr()//
+            函数同时也会获取到类型的对象名
+        end note
+        :进行深度搜索;
+        :逐层迭代搜索，搜索直接或者间接引用
+        此 ref 地址的其他 ref。;
+    elseif (//是 HEAP 段 && free//) then (heap && free)
+        :找不到对象;
+        stop
+    else (其他情况)
+        :对象已经找到，无需深度搜索;
+    endif
+}
+
+partition 打印结果 {
+    repeat :遍历 **refs**;
+        :调用 //print_ref()// 打印每个 **ref**;
+        note left
+            //print_ref()// 函数细节
+            单独放一个文件
+        end note
+    repeat while
+}
+
+'结束
+end
+@enduml
