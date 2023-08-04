@@ -1,0 +1,44 @@
+@startuml ActivityInit
+skin rose
+
+' 主线程
+main_thread --> "SceneService::AfterInit()" as scene_init
+scene_init -->[g_luaStateMgr.Init("sceneserver")] "CLuaStateMgr::Init()" as lua_state
+lua_state -->[xLuaStateMgr::Init(strServerName)] "xLuaStateMgr::Init()" as xlua
+xlua -->[CallLuaGlobalFuncNoArgs(m_luaState, "InitGlobalMgr", flag)] "InitGlobalMgr()" as InitGlobal
+note right: 位于 lua/sceneserver/main.lua
+
+InitGlobal -left-> "InitRequire()"
+
+"InitRequire()" --> [RegisterGlobalMgr("activitiesMgr",\n CActivitiesMgr:new())] "CActivitiesMgr:new()" as RegAct
+note left: 注册 g_activitiesMgr
+InitGlobal -->[g_activitiesMgr:Init()] "CActivitiesMgr:Init()" as ActInit
+RegAct .> ActInit
+ActInit -->[self:InitConfig()] "CActivitiesMgr:InitConfig()" as ActInitCfg
+ActInitCfg -->[遍历配置表，加载配置] "self.m_config[dwActivityID] = cfg"
+
+' lua
+lua_global -->[RegisterBaseMgr("DreamIslandMgr",\n EActivityType_DreamIsland, CDreamIslandMgr) \n//位于 lua/sceneserver/CDreamIslandInc.lua] "RegisterBaseMgr()" as RegBase
+RegBase -->[RegisterGlobalMgr(\nstrName, oBaseMgr:new())] "CBaseMgr:Init()" as BaseMgrInit
+BaseMgrInit -->[g_activitiesMgr:RegisterActivityByType(\nself.m_dwActivityType, self)] "CActivitiesMgr:RegisterActivityByType()" as RegActType
+RegActType -->[按照类型注册活动] "self.m_activitiesMapType[dwActivityTypeID] = oActivity" as SetAct
+
+"TimeTick::run()" -->[CallLuaClassFuncNoArgsNoRet(\ng_luaStateMgr.Get(),\n"activitiesMgr",\n"OnServerStart")] "CActivitiesMgr:OnServerStart()" as ActMgrStart
+ActMgrStart -->[self:OnRefresh(true)] "CActivitiesMgr:OnRefresh()" as Ref
+ActMgrStart -> "注册 Refresh 定时器" as RefTimer
+RefTimer -->[OnTimer] Ref
+
+Ref -->[TryCall(self.OnActivityStart,\n self, dwActivityID)] "CActivitiesMgr:OnActivityStart()" as ActStart
+ActStart --> "self.m_openActivitiesType[cfg.TYPE] =\n dwActivityID" as SetOpenActID
+ActStart --> "oActivities = self.m_activitiesMapType[cfg.TYPE]" as GetAct
+SetAct .>GetAct
+GetAct -->[oActivities:OnGameStart()] "CBaseMgr:OnGameStart()" as BaseStart
+
+BaseStart -->[local dwActivityID =\n g_activitiesMgr:GetOpenActivityIdByType(\nself.m_dwActivityType)] "CActivitiesMgr:GetOpenActivityIdByType()" as GetType
+GetType -> "return self.m_openActivitiesType[\ndwActivityTypeID]" as RetActID
+SetOpenActID ..> RetActID
+GetType --> "self.m_dwActivityID = dwActivityID" as SetID
+RetActID ..> SetID
+
+
+@enduml
