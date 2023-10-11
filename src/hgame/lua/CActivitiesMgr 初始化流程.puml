@@ -1,0 +1,20 @@
+@startuml ActivitiesMgr:Init
+skin rose
+' 主线程
+main_thread --> "SceneService::AfterInit()" as scene_init
+note left: 以 scene 为例
+scene_init -->[g_luaStateMgr.Init("sceneserver")] "CLuaStateMgr::Init()" as lua_state
+lua_state -->[xLuaStateMgr::Init(strServerName)] "xLuaStateMgr::Init()" as xlua
+xlua -->[CallLuaGlobalFuncNoArgs(m_luaState, "InitGlobalMgr", flag)] "InitGlobalMgr()" as InitGlobal
+note right: 位于 lua/sceneserver/main.lua
+
+InitGlobal -left-> "InitRequire()"
+
+"InitRequire()" --> [RegisterGlobalMgr("activitiesMgr",\n CActivitiesMgr:new())] "CActivitiesMgr:new()" as RegAct
+note left: 注册 g_activitiesMgr
+InitGlobal -->[g_activitiesMgr:Init()] "CActivitiesMgr:Init()" as ActInit
+RegAct .> ActInit
+ActInit -->[self:InitConfig()] "CActivitiesMgr:InitConfig()" as ActInitCfg
+ActInitCfg -->[遍历配置表，加载配置] "self.m_config[dwActivityID] = cfg"
+
+@enduml
