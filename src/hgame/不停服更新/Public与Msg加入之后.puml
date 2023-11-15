@@ -1,0 +1,27 @@
+@startuml super 状态图
+' 基础设置
+skin rose
+autoactivate on
+
+' ===定义角色===
+actor QA
+actor player
+
+participant super
+
+box "老进程" #LightBlue
+    participant gateway
+    participant scene
+    participant record
+    participant public
+    participant msg
+end box
+
+participant new_gateway
+participant new_record
+participant new_scene
+participant new_public
+participant new_msg
+
+actor 运维
+' ===定义角色结束===
